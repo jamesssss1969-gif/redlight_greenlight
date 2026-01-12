@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Red Light Green Light</title>
+
+<style>
+body{
+  font-family:system-ui,sans-serif;
+  background:#0f172a;
+  color:#e5e7eb;
+  display:flex;
+  justify-content:center;
+  padding:20px;
+}
+.panel{
+  background:#020617;
+  padding:20px;
+  border-radius:14px;
+  width:380px;
+  max-width:95vw;
+  box-shadow:0 20px 40px rgba(0,0,0,.6);
+}
+h1{text-align:center;margin-top:0}
+
+.section{margin-bottom:16px}
+label{
+  font-size:.9rem;
+  color:#cbd5f5;
+  display:flex;
+  align-items:center;
+  justify-content:space-between
+}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+
+.lights{
+  display:flex;
+  justify-content:space-around;
+  margin:18px 0 10px;
+}
+.light{
+  width:80px;
+  height:80px;
+  border-radius:50%;
+  background:#1f2937;
+  opacity:.25;
+  transition:.3s
+}
+.light.red.active{
+  background:#ef4444;
+  opacity:1;
+  box-shadow:0 0 25px rgba(239,68,68,.8)
+}
+.light.green.active{
+  background:#22c55e;
+  opacity:1;
+  box-shadow:0 0 25px rgba(34,197,94,.8)
+}
+.light.amber.active{
+  background:#f59e0b;
+  opacity:1;
+  box-shadow:0 0 25px rgba(245,158,11,.9)
+}
+
+#stopwatch{
+  text-align:center;
+  font-size:.9rem;
+  color:#9ca3af;
+  margin-bottom:10px
+}
+
+button{
+  width:100%;
+  padding:12px;
+  border-radius:999px;
+  border:none;
+  background:#1d4ed8;
+  color:#fff;
+  font-size:1rem;
+  font-weight:600;
+  cursor:pointer;
+  margin-top:10px
+}
+button.secondary{background:#374151}
+button:disabled{opacity:.5;cursor:not-allowed}
+
+input[type="checkbox"].toggle{
+  width:50px;
+  height:26px;
+  position:relative;
+  -webkit-appearance:none;
+  background:#374151;
+  outline:none;
+  border-radius:13px;
+  transition:.3s;
+  cursor:pointer;
+}
+input[type="checkbox"].toggle:checked{background:#1d4ed8;}
+input[type="checkbox"].toggle:before{
+  content:"";
+  position:absolute;
+  width:22px;
+  height:22px;
+  border-radius:50%;
+  top:2px;
+  left:2px;
+  background:#fff;
+  transition:.3s;
+}
+input[type="checkbox"].toggle:checked:before{
+  transform:translateX(24px);
+}
+</style>
+</head>
+
+<body>
+<div class="panel">
+<h1>Red Light Green Light</h1>
+
+<!-- RED -->
+<div class="section">
+<label>Red durations (s)</label>
+<div class="row">
+<label>5 <input type="checkbox" class="redDur toggle" value="5" checked></label>
+<label>10 <input type="checkbox" class="redDur toggle" value="10" checked></label>
+<label>15 <input type="checkbox" class="redDur toggle" value="15"></label>
+<label>20 <input type="checkbox" class="redDur toggle" value="20"></label>
+<label>25 <input type="checkbox" class="redDur toggle" value="25"></label>
+<label>30 <input type="checkbox" class="redDur toggle" value="30"></label>
+</div>
+</div>
+
+<!-- GREEN -->
+<div class="section">
+<label>Green durations (s)</label>
+<div class="row">
+<label>5 <input type="checkbox" class="greenDur toggle" value="5"></label>
+<label>10 <input type="checkbox" class="greenDur toggle" value="10" checked></label>
+<label>15 <input type="checkbox" class="greenDur toggle" value="15" checked></label>
+<label>20 <input type="checkbox" class="greenDur toggle" value="20"></label>
+<label>25 <input type="checkbox" class="greenDur toggle" value="25"></label>
+<label>30 <input type="checkbox" class="greenDur toggle" value="30"></label>
+</div>
+</div>
+
+<!-- YELLOW TOGGLE -->
+<div class="section">
+<label>Enable Yellow <input type="checkbox" id="yellowToggle" class="toggle"></label>
+</div>
+
+<div class="lights">
+  <div id="red" class="light red"></div>
+  <div id="amber" class="light amber"></div>
+  <div id="green" class="light green"></div>
+</div>
+
+<div id="stopwatch">00:00</div>
+
+<button id="startBtn">Start</button>
+<button id="resetBtn" class="secondary">Reset</button>
+</div>
+
+<script>
+/* AUDIO */
+let audioCtx;
+function initAudio(){
+  if(!audioCtx){
+    audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  }
+}
+function tone(freq,d=0.25,g=0.25){
+  const o = audioCtx.createOscillator();
+  const ga = audioCtx.createGain();
+  o.connect(ga).connect(audioCtx.destination);
+  o.frequency.value = freq;
+  ga.gain.value = g;
+  o.start();
+  o.stop(audioCtx.currentTime + d);
+}
+function beep(type){
+  if(type==='red') tone(300);
+  if(type==='green') tone(750);
+  if(type==='amber') tone(520,0.35);
+}
+
+/* CORE */
+let phase=null;
+let timer=null;
+let timeLeft=0;
+let stopwatchTimer=null;
+let secondsElapsed=0;
+
+function pickChecked(cls){
+  const v=[...document.querySelectorAll(`.${cls}:checked`)].map(c=>+c.value);
+  return v.length ? v[Math.floor(Math.random()*v.length)] : 5;
+}
+function clearLights(){
+  ['red','green','amber'].forEach(id =>
+    document.getElementById(id).classList.remove('active')
+  );
+}
+
+function setPhase(p,d){
+  phase=p;
+  clearLights();
+  document.getElementById(p).classList.add('active');
+  beep(p);
+  timeLeft=d;
+}
+
+function nextPhase(){
+  const yellowEnabled = document.getElementById('yellowToggle').checked;
+
+  if(yellowEnabled && Math.random() < 0.2){
+    setPhase('amber',15);
+    return;
+  }
+
+  if(phase==='red') setPhase('green',pickChecked('greenDur'));
+  else setPhase('red',pickChecked('redDur'));
+}
+
+function tick(){
+  timeLeft--;
+  if(timeLeft<=0) nextPhase();
+}
+
+function startStopwatch(){
+  stopwatchTimer=setInterval(()=>{
+    secondsElapsed++;
+    document.getElementById('stopwatch').textContent =
+      String(Math.floor(secondsElapsed/60)).padStart(2,'0') + ':' +
+      String(secondsElapsed%60).padStart(2,'0');
+  },1000);
+}
+
+/* EVENTS */
+startBtn.onclick=()=>{
+  initAudio();
+  if(timer) return;
+  setPhase('red',pickChecked('redDur'));
+  timer=setInterval(tick,1000);
+  startStopwatch();
+};
+
+resetBtn.onclick=()=>{
+  clearInterval(timer);
+  clearInterval(stopwatchTimer);
+  timer=null;
+  stopwatchTimer=null;
+  secondsElapsed=0;
+  clearLights();
+  document.getElementById('stopwatch').textContent='00:00';
+};
+</script>
+</body>
+</html>
