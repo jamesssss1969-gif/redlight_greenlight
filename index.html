@@ -212,7 +212,7 @@ function setPhase(p,d){
 function nextPhase(){
   const yellowEnabled = document.getElementById('yellowToggle').checked;
 
-  if(yellowEnabled && Math.random() < 0.2){
+  if(yellowEnabled && Math.random() < 0.1){
     setPhase('amber',15);
     return;
   }
@@ -255,4 +255,5 @@ resetBtn.onclick=()=>{
 };
 </script>
 </body>
+
 </html>
